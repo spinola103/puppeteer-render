@@ -14,35 +14,58 @@ const scrapeLogic = async (res) => {
         ? process.env.PUPPETEER_EXECUTABLE_PATH
         : puppeteer.executablePath(),
   });
+
   try {
     const page = await browser.newPage();
+    await page.setViewport({ width: 1280, height: 1024 });
 
-    await page.goto("https://developer.chrome.com/");
+    // Change username or search query as needed
+    const username = "elonmusk"; // or from req.query.username
+    await page.goto(`https://twitter.com/${username}`, {
+      waitUntil: "networkidle2",
+    });
 
-    // Set screen size
-    await page.setViewport({ width: 1080, height: 1024 });
+    // Wait until tweets are loaded
+    await page.waitForSelector("article", { timeout: 10000 });
 
-    // Type into search box
-    await page.type(".search-box__input", "automate beyond recorder");
+    const tweetsData = await page.$$eval("article", (tweets) => {
+      return tweets.map((article) => {
+        const tweetText =
+          article.querySelector("div[lang]")?.innerText?.trim() || "";
+        const user =
+          article.querySelector("div span span")?.innerText?.trim() || "";
+        const timestamp =
+          article.querySelector("time")?.getAttribute("datetime") || "";
+        const link =
+          article.querySelector('a[role="link"][tabindex="-1"]')?.href || "";
+        const likeCount =
+          article.querySelector('div[data-testid="like"]')?.innerText || "0";
+        const retweetCount =
+          article.querySelector('div[data-testid="retweet"]')?.innerText || "0";
+        const replyCount =
+          article.querySelector('div[data-testid="reply"]')?.innerText || "0";
+        const verified = !!article.querySelector(
+          'svg[aria-label="Verified account"]'
+        );
 
-    // Wait and click on first result
-    const searchResultSelector = ".search-box__link";
-    await page.waitForSelector(searchResultSelector);
-    await page.click(searchResultSelector);
+        return {
+          tweetText,
+          user,
+          timestamp,
+          link,
+          likeCount,
+          retweetCount,
+          replyCount,
+          verified,
+        };
+      });
+    });
 
-    // Locate the full title with a unique string
-    const textSelector = await page.waitForSelector(
-      "text/Customize and automate"
-    );
-    const fullTitle = await textSelector.evaluate((el) => el.textContent);
-
-    // Print the full title
-    const logStatement = `The title of this blog post is ${fullTitle}`;
-    console.log(logStatement);
-    res.send(logStatement);
+    console.log(tweetsData);
+    res.json({ tweets: tweetsData });
   } catch (e) {
     console.error(e);
-    res.send(`Something went wrong while running Puppeteer: ${e}`);
+    res.status(500).send(`Something went wrong while running Puppeteer: ${e}`);
   } finally {
     await browser.close();
   }

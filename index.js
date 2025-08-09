@@ -1,15 +1,17 @@
 const express = require("express");
 const { scrapeLogic } = require("./scrapeLogic");
-const app = express();
+require("dotenv").config();
 
+const app = express();
 const PORT = process.env.PORT || 4000;
 
+// Example: GET /scrape?username=elonmusk
 app.get("/scrape", (req, res) => {
   scrapeLogic(res);
 });
 
 app.get("/", (req, res) => {
-  res.send("Render Puppeteer server is up and running!");
+  res.send("Render Puppeteer Twitter Scraper is running!");
 });
 
 app.listen(PORT, () => {
