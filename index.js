@@ -5,9 +5,9 @@ require("dotenv").config();
 const app = express();
 const PORT = process.env.PORT || 4000;
 
-// Example: GET /scrape?username=elonmusk
+// Pass both req and res
 app.get("/scrape", (req, res) => {
-  scrapeLogic(res);
+  scrapeLogic(req, res);
 });
 
 app.get("/", (req, res) => {

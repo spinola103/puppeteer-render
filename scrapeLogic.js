@@ -1,7 +1,7 @@
 const puppeteer = require("puppeteer");
 require("dotenv").config();
 
-const scrapeLogic = async (res) => {
+const scrapeLogic = async (req, res) => {
   const browser = await puppeteer.launch({
     args: [
       "--disable-setuid-sandbox",
@@ -16,17 +16,16 @@ const scrapeLogic = async (res) => {
   });
 
   try {
+    const username = req.query.username || "phantom"; // Dynamic username
     const page = await browser.newPage();
     await page.setViewport({ width: 1280, height: 1024 });
 
-    // Change username or search query as needed
-    const username = "elonmusk"; // or from req.query.username
     await page.goto(`https://twitter.com/${username}`, {
       waitUntil: "networkidle2",
     });
 
     // Wait until tweets are loaded
-    await page.waitForSelector("article", { timeout: 10000 });
+    await page.waitForSelector("article", { timeout: 15000 });
 
     const tweetsData = await page.$$eval("article", (tweets) => {
       return tweets.map((article) => {
@@ -36,16 +35,32 @@ const scrapeLogic = async (res) => {
           article.querySelector("div span span")?.innerText?.trim() || "";
         const timestamp =
           article.querySelector("time")?.getAttribute("datetime") || "";
-        const link =
-          article.querySelector('a[role="link"][tabindex="-1"]')?.href || "";
-        const likeCount =
-          article.querySelector('div[data-testid="like"]')?.innerText || "0";
-        const retweetCount =
-          article.querySelector('div[data-testid="retweet"]')?.innerText || "0";
-        const replyCount =
-          article.querySelector('div[data-testid="reply"]')?.innerText || "0";
+
+        // Correct tweet permalink
+        const linkElem = article.querySelector("time")?.parentElement;
+        const link = linkElem?.getAttribute("href")
+          ? `https://twitter.com${linkElem.getAttribute("href")}`
+          : "";
+
+        // Function to parse counts from aria-label
+        const getCount = (label) => {
+          const btn = [...article.querySelectorAll('div[role="button"]')].find(
+            (el) =>
+              el.getAttribute("aria-label")?.toLowerCase().includes(label)
+          );
+          if (!btn) return "0";
+          const match = btn
+            .getAttribute("aria-label")
+            .match(/\d+(?:,\d{3})*/);
+          return match ? match[0].replace(/,/g, "") : "0";
+        };
+
+        const likeCount = getCount("like");
+        const retweetCount = getCount("retweet");
+        const replyCount = getCount("reply");
+
         const verified = !!article.querySelector(
-          'svg[aria-label="Verified account"]'
+          'svg[aria-label="Verified account"], svg[aria-label="Verified"]'
         );
 
         return {
